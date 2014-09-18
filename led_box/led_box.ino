@@ -53,7 +53,7 @@ void setup() {
   }
   
   // Until power issues are resolved
-  FastLED.setBrightness(90);
+  FastLED.setBrightness(40);
 
   FastLED.show();
 }
@@ -70,31 +70,43 @@ CRGBPalette16 palettes[] = {
   PartyColors_p,
   LAST
 };
-  
-void drawFlag() {
+
+// Bad example because of overlapping pixels
+void drawFlag(float brightness) {
   for(int j=0; j<24; j++) {
     for(int i=0; i<8; i++) {
       if(j<6 || j>17)
-        leds[XY(j,i)] = CRGB::Red;
+        leds[XY(j,i)] += CRGB::Red;
       else
-        leds[XY(j,i)] = CRGB::White;
+        leds[XY(j,i)] += CRGB::White;
+      leds[XY(j,i)].fadeLightBy(brightness);
+        
     }
   }
-  leds[XY(11,7)] = CRGB::Red;
-  leds[XY(12,7)] = CRGB::Red;
+  leds[XY(11,7)] += CRGB::Red;
+  leds[XY(11,7)].fadeLightBy(brightness);
+  leds[XY(12,7)] += CRGB::Red;
+  leds[XY(12,7)].fadeLightBy(brightness);
   for(int i=7; i<17; i++) {
-    leds[XY(i,6)] = CRGB::Red;
-    leds[XY(i,4)] = CRGB::Red;
+    leds[XY(i,6)] += CRGB::Red;
+    leds[XY(i,4)] += CRGB::Red;
+    leds[XY(i,6)].fadeLightBy(brightness);
+    leds[XY(i,4)].fadeLightBy(brightness);
   }
   for(int i=9; i<15; i++) {
-    leds[XY(i,5)] = CRGB::Red;
+    leds[XY(i,5)] += CRGB::Red;
+    leds[XY(i,5)].fadeLightBy(brightness);
   }
   for(int j=1; j<=3; j++) {
-    for(int i=10; i<14; i++)
-      leds[XY(i,j)] = CRGB::Red;
+    for(int i=10; i<14; i++) {
+      leds[XY(i,j)] += CRGB::Red;
+      leds[XY(i,j)].fadeLightBy(brightness);
+    }
   }
-  leds[XY(10,0)] = CRGB::Red;
-  leds[XY(13,0)] = CRGB::Red;
+  leds[XY(10,0)] += CRGB::Red;
+  leds[XY(10,0)].fadeLightBy(brightness);
+  leds[XY(13,0)] += CRGB::Red;
+  leds[XY(13,0)].fadeLightBy(brightness);
 }
 
 // Needs http://www.pjrc.com/teensy/td_libs_Time.html
@@ -118,7 +130,6 @@ void loop() {
 
   int currentTime = now();
   if(inTransition && currentTime > transitionTime + TRANSITION_DURATION) {
-    Serial.println("Ending transition");
     inTransition = false;
     currentBrightness = 256;
   }
@@ -134,17 +145,13 @@ void loop() {
     // and do the opposite with the new one
     previousBrightness = 255*(float)(currentTime - lastTime)/TRANSITION_DURATION;
     currentBrightness = 255-previousBrightness;
-    Serial.print(previousBrightness);
-    Serial.print(", ");
-    Serial.println(currentBrightness);
   }
 
   // Check if time is up for this display
   if(currentTime > lastTime + DELAY_BETWEEN_ANIMATIONS) {
-    Serial.println("Starting transition");
     lastTime = currentTime;
     previousDisplay = currentDisplay;
-    if(currentDisplay == 1) {
+    if(currentDisplay == 2) {
       currentDisplay = 0;
     } else {
       currentDisplay++;
@@ -154,22 +161,29 @@ void loop() {
   }
   
   // Draw
-  FastLED.countFPS(60);
+  //FastLED.countFPS(60);
   FastLED.show();
 }
 
 void draw(int animation, float brightness) {
   switch(animation) {
     case 0:
-      showRainbow(palettes[1], 64, 40, 1, 65535/2, brightness, paramList[animation]);
+      Serial.print("Before ");
+      Serial.println(paramList[animation].time);
+      showRainbow(palettes[1], 64, 40, 1, 65535/2, brightness, &paramList[animation]);
+      Serial.print("After ");
+      Serial.println(paramList[animation].time);
       break;
     case 1:
-      showRainbow(palettes[0], 300, 40, 5, 65535/4, brightness, paramList[animation]);
+      showRainbow(palettes[0], 300, 40, 5, 65535/4, brightness, &paramList[animation]);
+      break;
+    case 2:
+      showRainbow(palettes[4], 120, 80, 3, 65535/3, brightness, &paramList[animation]);
       break;
   }
 }
 
-void showRainbow(CRGBPalette16 palette, int paletteSize, int curveSize, int quietSpeed, int sineSize, float brightness, struct PARAMS param) {
+void showRainbow(CRGBPalette16 palette, int paletteSize, int curveSize, int quietSpeed, int sineSize, float brightness, struct PARAMS *param) {
   int leftVal = left[0];
   int rightVal = right[0];
 
@@ -187,13 +201,13 @@ void showRainbow(CRGBPalette16 palette, int paletteSize, int curveSize, int quie
       float sine = (float)leftValue*sin16((float)sineSize*(float)y/(float)HEIGHT)/(float)sineSize;
       //Serial.println(sin16(65535.0*y/HEIGHT)/32767.0);
 
-      leds[XY(x,y)] += ColorFromPalette( palette, paletteSize*x/WIDTH + sine + param.wait ).fadeLightBy(brightness);
-      //leds[XY(WIDTH-x,y)] = leds[XY(x,y)];
+      leds[XY(x,y)] += ColorFromPalette( palette, paletteSize*x/WIDTH + sine + param->wait ).fadeLightBy(brightness);
+      leds[XY(WIDTH-1-x,y)] = leds[XY(x,y)];
       //leds[XY(x,y)].fadeLightBy(brightness[XY(x,y)]);
     }
   }
-  param.time += .3;
-  param.wait += rightValue < quietSpeed ? quietSpeed : rightValue;
+  param->time += .3;
+  param->wait += rightValue < quietSpeed ? quietSpeed : rightValue;
 }
 
 void setAllLedsTo(CRGB color) {
